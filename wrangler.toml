@@ -1,0 +1,14 @@
+name = "stemgharbiya-join-portal"
+main = "./functions/api/submit.js"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "stemgharbiya-applications"
+database_id = "724cedac-bd4f-45ce-aa5f-2b925d6c87a2"
+
+[vars]
+RESEND_API_KEY = "your_resend_api_key_here"
+RESEND_SENDER_EMAIL = "your-verified-email@resend.dev"
+TEAM_NOTIFICATION_EMAIL = "your-team-email@example.com"
