@@ -64,6 +64,10 @@ const securityHeaders = {
 };
 
 async function sendResendEmail(emailData: EmailData, env: Env, type: string) {
+  if (env.DISABLE_EMAILS) {
+    console.log('Email sending disabled. email:', emailData);
+    return;
+  }
   try {
     if (!env.RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY is not configured');
