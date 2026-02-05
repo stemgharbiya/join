@@ -40,9 +40,7 @@ const ALLOWED_INTERESTS = [
 ];
 
 const securityHeaders = {
-  'Content-Type': 'application/json',
   'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin'
 };
 
@@ -133,17 +131,18 @@ async function sendApplicantEmail(data, interests, env) {
 }
 
 export async function onRequestPost(context) {
+  const headers = { 'Content-Type': 'application/json', ...securityHeaders }
   try {
     if (!context.env.DB) {
       return new Response(JSON.stringify({ error: 'Service temporarily unavailable' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
     if (!context.env.RESEND_API_KEY || !context.env.RESEND_SENDER_EMAIL || !context.env.TEAM_NOTIFICATION_EMAIL) {
       return new Response(JSON.stringify({ error: 'Service temporarily unavailable' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -155,7 +154,7 @@ export async function onRequestPost(context) {
         error: 'Invalid email format'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -164,7 +163,7 @@ export async function onRequestPost(context) {
         error: 'Invalid school email domain'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -173,7 +172,7 @@ export async function onRequestPost(context) {
         error: 'Invalid name format'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -182,7 +181,7 @@ export async function onRequestPost(context) {
         error: 'Invalid GitHub username format'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -191,7 +190,7 @@ export async function onRequestPost(context) {
         error: 'Invalid senior year format'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -200,7 +199,7 @@ export async function onRequestPost(context) {
         error: 'Invalid motivation format'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -212,7 +211,7 @@ export async function onRequestPost(context) {
         error: 'Select at least one interest'
       }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -223,7 +222,7 @@ export async function onRequestPost(context) {
           error: 'Invalid interest selection'
         }), {
           status: 400,
-          headers: { 'Content-Type': 'application/json', ...securityHeaders }
+          headers
         });
       }
     }
@@ -240,7 +239,7 @@ export async function onRequestPost(context) {
           error: 'Application already exists'
         }), {
           status: 409,
-          headers: { 'Content-Type': 'application/json', ...securityHeaders }
+          headers
         });
       }
     } catch (dbError) {
@@ -249,7 +248,7 @@ export async function onRequestPost(context) {
         error: 'Service temporarily unavailable'
       }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -272,7 +271,7 @@ export async function onRequestPost(context) {
         error: 'Service temporarily unavailable'
       }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -292,7 +291,7 @@ export async function onRequestPost(context) {
         message: 'Application submitted successfully'
       }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders }
+        headers
       });
     }
 
@@ -301,7 +300,7 @@ export async function onRequestPost(context) {
       message: 'Application submitted successfully'
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...securityHeaders }
+      headers
     });
 
   } catch (error) {
@@ -310,7 +309,7 @@ export async function onRequestPost(context) {
       error: 'Service temporarily unavailable'
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...securityHeaders }
+      headers
     });
   }
 }
