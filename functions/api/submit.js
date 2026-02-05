@@ -150,7 +150,7 @@ export async function onRequestPost(context) {
     const data = await context.request.json();
 
     // Input validation with length limits
-    if (!data.schoolEmail || typeof data.schoolEmail !== 'string' || data.schoolEmail.length > MAX_FIELD_LENGTHS.email) {
+    if (!data.schoolEmail || typeof data.schoolEmail !== 'string' || data.schoolEmail.length > MAX_FIELD_LENGTHS.schoolEmail) {
       return new Response(JSON.stringify({
         error: 'Invalid email format'
       }), {
@@ -168,7 +168,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    if (!data.fullName || typeof data.fullName !== 'string' || data.fullName.length > MAX_FIELD_LENGTHS.name || data.fullName.trim().length === 0) {
+    if (!data.fullName || typeof data.fullName !== 'string' || data.fullName.length > MAX_FIELD_LENGTHS.fullName || data.fullName.trim().length === 0) {
       return new Response(JSON.stringify({
         error: 'Invalid name format'
       }), {
@@ -177,7 +177,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    if (!data.githubUsername || typeof data.githubUsername !== 'string' || data.githubUsername.length > MAX_FIELD_LENGTHS.github || !validateGitHubUsername(data.githubUsername)) {
+    if (!data.githubUsername || typeof data.githubUsername !== 'string' || data.githubUsername.length > MAX_FIELD_LENGTHS.githubUsername || !validateGitHubUsername(data.githubUsername)) {
       return new Response(JSON.stringify({
         error: 'Invalid GitHub username format'
       }), {
