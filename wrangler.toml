@@ -20,3 +20,4 @@ database_id = "724cedac-bd4f-45ce-aa5f-2b925d6c87a2"
 RESEND_SENDER_EMAIL = "stemgharbiya@stem.a8k.dev"
 TEAM_NOTIFICATION_EMAIL = "team@stem.a8k.dev"
 DISABLE_EMAILS = false
+TURNSTILE_SITE_KEY = "0x4AAAAAACYCSDOBa1wv0RmS"

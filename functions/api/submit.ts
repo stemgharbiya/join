@@ -6,6 +6,7 @@ interface ApplicationData {
   seniorYear: string;
   interests: string | string[];
   motivation: string;
+  "cf-turnstile-response": string;
 }
 
 interface EmailData {
@@ -27,6 +28,67 @@ async function rateLimit(env: Env, userKey: string) {
     );
   }
   return null;
+}
+
+async function verifyTurnstile(token: string, secret: string, ip: string) {
+  if (!token || typeof token !== "string" || token.trim().length === 0) {
+    return new Response(
+      JSON.stringify({ error: "Invalid verification token" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  if (!secret || typeof secret !== "string") {
+    return new Response(
+      JSON.stringify({ error: "Service temporarily unavailable" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  try {
+    // Validate the token by calling the "/siteverify" API.
+    let formData = new FormData();
+    formData.append("secret", secret);
+    formData.append("response", token.trim());
+    formData.append("remoteip", ip);
+
+    const result = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        body: formData,
+        method: "POST",
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+
+    if (!result.ok) {
+      throw new Error(`Verification service returned ${result.status}`);
+    }
+
+    const outcome: any = await result.json();
+
+    if (!outcome.success) {
+      console.error("Turnstile verification failed:", {
+        "error-codes": outcome["error-codes"],
+        ip: ip || "unknown",
+        timestamp: new Date().toISOString(),
+      });
+
+      return new Response(
+        JSON.stringify({ error: "Verification failed. Please try again." }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    return null;
+  } catch (error: any) {
+    console.error("Turnstile verification error:", error.message);
+
+    return new Response(
+      JSON.stringify({ error: "Verification service temporarily unavailable" }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
 }
 
 function escapeHtml(str: string) {
@@ -175,17 +237,14 @@ async function sendApplicantEmail(
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const headers = { "Content-Type": "application/json", ...securityHeaders };
-
   try {
     if (!context.env.DB) {
       return new Response(
         JSON.stringify({ error: "Service temporarily unavailable" }),
-        {
-          status: 500,
-          headers,
-        },
+        { status: 500, headers },
       );
     }
+
     if (
       !context.env.RESEND_API_KEY ||
       !context.env.RESEND_SENDER_EMAIL ||
@@ -193,29 +252,53 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     ) {
       return new Response(
         JSON.stringify({ error: "Service temporarily unavailable" }),
-        {
-          status: 500,
-          headers,
-        },
+        { status: 500, headers },
+      );
+    }
+
+    // Validate Turnstile configuration
+    if (!context.env.TURNSTILE_SECRET_KEY) {
+      console.error("TURNSTILE_SECRET_KEY not configured");
+      return new Response(
+        JSON.stringify({ error: "Service temporarily unavailable" }),
+        { status: 500, headers },
       );
     }
 
     const data: ApplicationData = await context.request.json();
+
+    const turnstileToken = data["cf-turnstile-response"];
+
+    if (!turnstileToken || typeof turnstileToken !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Invalid verification token" }),
+        { status: 400, headers },
+      );
+    }
+
+    const ip =
+      context.request.headers.get("CF-Connecting-IP") ||
+      context.request.headers.get("X-Forwarded-For")?.split(",")[0] ||
+      "unknown";
+
+    const turnstileError = await verifyTurnstile(
+      turnstileToken,
+      context.env.TURNSTILE_SECRET_KEY,
+      ip,
+    );
+    if (turnstileError) {
+      return turnstileError;
+    }
 
     if (
       !data.schoolEmail ||
       typeof data.schoolEmail !== "string" ||
       data.schoolEmail.length > MAX_FIELD_LENGTHS.schoolEmail
     ) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid email format",
-        }),
-        {
-          status: 400,
-          headers,
-        },
-      );
+      return new Response(JSON.stringify({ error: "Invalid email format" }), {
+        status: 400,
+        headers,
+      });
     }
 
     const rateLimitResponse = await rateLimit(context.env, data.schoolEmail);
@@ -223,13 +306,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     if (!data.schoolEmail.endsWith("@stemgharbiya.moe.edu.eg")) {
       return new Response(
-        JSON.stringify({
-          error: "Invalid school email domain",
-        }),
-        {
-          status: 400,
-          headers,
-        },
+        JSON.stringify({ error: "Invalid school email domain" }),
+        { status: 400, headers },
       );
     }
 
@@ -239,15 +317,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       data.fullName.length > MAX_FIELD_LENGTHS.fullName ||
       data.fullName.trim().length === 0
     ) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid name format",
-        }),
-        {
-          status: 400,
-          headers,
-        },
-      );
+      return new Response(JSON.stringify({ error: "Invalid name format" }), {
+        status: 400,
+        headers,
+      });
     }
 
     if (
@@ -257,13 +330,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       !validateGitHubUsername(data.githubUsername)
     ) {
       return new Response(
-        JSON.stringify({
-          error: "Invalid GitHub username format",
-        }),
-        {
-          status: 400,
-          headers,
-        },
+        JSON.stringify({ error: "Invalid GitHub username format" }),
+        { status: 400, headers },
       );
     }
 
@@ -273,13 +341,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       !validateSeniorYear(data.seniorYear)
     ) {
       return new Response(
-        JSON.stringify({
-          error: "Invalid senior year format",
-        }),
-        {
-          status: 400,
-          headers,
-        },
+        JSON.stringify({ error: "Invalid senior year format" }),
+        { status: 400, headers },
       );
     }
 
@@ -290,13 +353,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       data.motivation.trim().length === 0
     ) {
       return new Response(
-        JSON.stringify({
-          error: "Invalid motivation format",
-        }),
-        {
-          status: 400,
-          headers,
-        },
+        JSON.stringify({ error: "Invalid motivation format" }),
+        { status: 400, headers },
       );
     }
 
@@ -312,30 +370,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       interests.length > 5
     ) {
       return new Response(
-        JSON.stringify({
-          error: "Select at least one interest",
-        }),
-        {
-          status: 400,
-          headers,
-        },
+        JSON.stringify({ error: "Select at least one interest" }),
+        { status: 400, headers },
       );
     }
 
-    // Validate each interest
     for (const interest of interests) {
       if (
         typeof interest !== "string" ||
         !ALLOWED_INTERESTS.includes(interest.trim())
       ) {
         return new Response(
-          JSON.stringify({
-            error: "Invalid interest selection",
-          }),
-          {
-            status: 400,
-            headers,
-          },
+          JSON.stringify({ error: "Invalid interest selection" }),
+          { status: 400, headers },
         );
       }
     }
@@ -351,25 +398,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         .first();
       if (existing) {
         return new Response(
-          JSON.stringify({
-            error: "Application already exists",
-          }),
-          {
-            status: 409,
-            headers,
-          },
+          JSON.stringify({ error: "Application already exists" }),
+          { status: 409, headers },
         );
       }
     } catch (dbError) {
       console.error("Database check error:", dbError);
       return new Response(
-        JSON.stringify({
-          error: "Service temporarily unavailable",
-        }),
-        {
-          status: 500,
-          headers,
-        },
+        JSON.stringify({ error: "Service temporarily unavailable" }),
+        { status: 500, headers },
       );
     }
 
@@ -391,13 +428,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     } catch (dbError) {
       console.error("Database insert error:", dbError);
       return new Response(
-        JSON.stringify({
-          error: "Service temporarily unavailable",
-        }),
-        {
-          status: 500,
-          headers,
-        },
+        JSON.stringify({ error: "Service temporarily unavailable" }),
+        { status: 500, headers },
       );
     }
 
@@ -413,17 +445,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         failedEmails.map((f) => f.reason?.message),
       );
 
-      // Return partial success with warning
       return new Response(
         JSON.stringify({
           success: true,
           warning: "Application received but notifications may be delayed",
           message: "Application submitted successfully",
         }),
-        {
-          status: 200,
-          headers,
-        },
+        { status: 200, headers },
       );
     }
 
@@ -432,32 +460,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         success: true,
         message: "Application submitted successfully",
       }),
-      {
-        status: 200,
-        headers,
-      },
+      { status: 200, headers },
     );
   } catch (error) {
     console.error("Submission error:", error);
     return new Response(
-      JSON.stringify({
-        error: "Service temporarily unavailable",
-      }),
-      {
-        status: 500,
-        headers,
-      },
+      JSON.stringify({ error: "Service temporarily unavailable" }),
+      { status: 500, headers },
     );
   }
 };
-
-export async function onRequest(context) {
-  if (context.request.method === "POST") {
-    return onRequestPost(context);
-  }
-
-  return new Response("Method not allowed", {
-    status: 405,
-    headers: { Allow: "POST", ...securityHeaders },
-  });
-}
