@@ -1,4 +1,23 @@
-function escapeHtml(str) {
+// Types
+interface ApplicationData {
+  fullName: string;
+  schoolEmail: string;
+  githubUsername: string;
+  seniorYear: string;
+  interests: string | string[];
+  motivation: string;
+}
+
+interface EmailData {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}
+
+
+
+function escapeHtml(str: string) {
   if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
@@ -8,7 +27,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-function validateSeniorYear(year) {
+function validateSeniorYear(year: string) {
   if (!year) return false;
   const match = String(year).match(/^[Ss](\d+)$/);
   if (!match) return false;
@@ -16,7 +35,7 @@ function validateSeniorYear(year) {
   return yearNum >= 25 && yearNum <= 30;
 }
 
-function validateGitHubUsername(username) {
+function validateGitHubUsername(username: string) {
   return /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/.test(username);
 }
 
@@ -44,7 +63,7 @@ const securityHeaders = {
   'Referrer-Policy': 'strict-origin-when-cross-origin'
 };
 
-async function sendResendEmail(emailData, env, type) {
+async function sendResendEmail(emailData: EmailData, env: Env, type: string) {
   try {
     if (!env.RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY is not configured');
@@ -77,7 +96,7 @@ async function sendResendEmail(emailData, env, type) {
   }
 }
 
-async function sendTeamEmail(data, interests, timestamp, env) {
+async function sendTeamEmail(data: ApplicationData, interests: ApplicationData['interests'], timestamp: string, env: Env) {
   const emailData = {
     from: env.RESEND_SENDER_EMAIL,
     to: [env.TEAM_NOTIFICATION_EMAIL],
@@ -88,7 +107,7 @@ async function sendTeamEmail(data, interests, timestamp, env) {
       <p><strong>Email:</strong> ${escapeHtml(data.schoolEmail)}</p>
       <p><strong>GitHub:</strong> ${escapeHtml(data.githubUsername)}</p>
       <p><strong>Senior Year:</strong> ${escapeHtml(data.seniorYear?.toUpperCase() || '')}</p>
-      <p><strong>Interests:</strong> ${interests.map(escapeHtml).join(', ')}</p>
+      <p><strong>Interests:</strong> ${(typeof interests === 'string' ? interests.split(',') : interests).map(escapeHtml).join(', ')}</p>
       <p><strong>Motivation:</strong> ${escapeHtml(data.motivation)}</p>
       <p><strong>Submitted:</strong> ${timestamp}</p>
       <hr/>
@@ -99,7 +118,7 @@ async function sendTeamEmail(data, interests, timestamp, env) {
   return sendResendEmail(emailData, env, 'team');
 }
 
-async function sendApplicantEmail(data, interests, env) {
+async function sendApplicantEmail(data: ApplicationData, interests: ApplicationData['interests'], env: Env) {
   const emailData = {
     from: env.RESEND_SENDER_EMAIL,
     to: [data.schoolEmail],
@@ -111,7 +130,7 @@ async function sendApplicantEmail(data, interests, env) {
       <ul>
         <li><strong>GitHub:</strong> ${escapeHtml(data.githubUsername)}</li>
         <li><strong>Senior Year:</strong> ${escapeHtml(data.seniorYear?.toUpperCase() || '')}</li>
-        <li><strong>Interests:</strong> ${interests.map(escapeHtml).join(', ')}</li>
+        <li><strong>Interests:</strong> ${(typeof interests === 'string' ? interests.split(',') : interests).map(escapeHtml).join(', ')}</li>
       </ul>
       <p><strong>What happens next?</strong></p>
       <ol>
@@ -130,7 +149,7 @@ async function sendApplicantEmail(data, interests, env) {
   return sendResendEmail(emailData, env, 'applicant');
 }
 
-export async function onRequestPost(context) {
+export const onRequestPost: PagesFunction<Env> = async (context) => {
   const headers = { 'Content-Type': 'application/json', ...securityHeaders }
   try {
     if (!context.env.DB) {
@@ -146,7 +165,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    const data = await context.request.json();
+    const data: ApplicationData = await context.request.json();
 
     // Input validation with length limits
     if (!data.schoolEmail || typeof data.schoolEmail !== 'string' || data.schoolEmail.length > MAX_FIELD_LENGTHS.schoolEmail) {
